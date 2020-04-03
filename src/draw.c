@@ -41,13 +41,22 @@ void draw_setup(void)
         pango_fdesc = pango_font_description_from_string(settings.font);
 }
 
-static struct color hex_to_color(int hexValue)
+static struct color hex_to_color(long int hexValue, int isRGBA)
 {
         struct color ret;
-        ret.r = ((hexValue >> 16) & 0xFF) / 255.0;
-        ret.g = ((hexValue >> 8) & 0xFF) / 255.0;
-        ret.b = ((hexValue) & 0xFF) / 255.0;
 
+        if(isRGBA) {
+                ret.r = ((hexValue >> 24) & 0xFF) / 255.0;
+                ret.g = ((hexValue >> 16) & 0xFF) / 255.0;
+                ret.b = ((hexValue >> 8) & 0xFF) / 255.0;
+                ret.a = ((hexValue) & 0xFF) / 255.0;
+        } else {
+                ret.r = ((hexValue >> 16) & 0xFF) / 255.0;
+                ret.g = ((hexValue >> 8) & 0xFF) / 255.0;
+                ret.b = ((hexValue) & 0xFF) / 255.0;
+                ret.a = 1.0;
+        }
+        
         return ret;
 }
 
@@ -59,7 +68,8 @@ static struct color string_to_color(const char *str)
                 LOG_W("Invalid color string: '%s'", str);
         }
 
-        return hex_to_color(val);
+        int isRGBA = strlen(str) > 7;
+        return hex_to_color(val, isRGBA);
 }
 
 static double color_apply_delta(double base, double delta)
@@ -464,9 +474,11 @@ static cairo_surface_t *render_background(cairo_surface_t *srf,
         else
                 height += settings.separator_height;
 
-        cairo_set_source_rgb(c, cl->frame.r, cl->frame.g, cl->frame.b);
+        cairo_set_source_rgba(c, cl->frame.r, cl->frame.g, cl->frame.b, cl->frame.a);
         draw_rounded_rect(c, x, y, width, height, corner_radius, first, last);
+        if(cl->frame.a != 1.0) cairo_set_operator(c, CAIRO_OPERATOR_SOURCE);
         cairo_fill(c);
+        if(cl->frame.a != 1.0) cairo_restore(c);
 
         /* adding frame */
         x += settings.frame_width;
@@ -482,19 +494,24 @@ static cairo_surface_t *render_background(cairo_surface_t *srf,
         else
                 height -= settings.separator_height;
 
-        cairo_set_source_rgb(c, cl->bg.r, cl->bg.g, cl->bg.b);
+        cairo_set_source_rgba(c, cl->bg.r, cl->bg.g, cl->bg.b, cl->bg.a);
         draw_rounded_rect(c, x, y, width, height, corner_radius, first, last);
+        
+        if(cl->bg.a != 1.0) cairo_set_operator(c, CAIRO_OPERATOR_SOURCE);
         cairo_fill(c);
+        if(cl->bg.a != 1.0) cairo_restore(c);
 
         if (   settings.sep_color.type != SEP_FRAME
             && settings.separator_height > 0
             && !last) {
                 struct color sep_color = layout_get_sepcolor(cl, cl_next);
-                cairo_set_source_rgb(c, sep_color.r, sep_color.g, sep_color.b);
+                cairo_set_source_rgba(c, sep_color.r, sep_color.g, sep_color.b, sep_color.a);
 
                 cairo_rectangle(c, settings.frame_width, y + height, width, settings.separator_height);
 
+                if(sep_color.a != 1.0) cairo_set_operator(c, CAIRO_OPERATOR_SOURCE);
                 cairo_fill(c);
+                if(sep_color.a != 1.0) cairo_restore(c);
         }
 
         cairo_destroy(c);
